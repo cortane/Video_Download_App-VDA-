@@ -1,0 +1,205 @@
+module VDA.UI.MainWindow
+
+open System
+open System.IO
+open System.Collections.Generic
+open System.Threading.Tasks
+open System.Windows
+open System.Windows.Controls
+open System.Windows.Media
+open Microsoft.Web.WebView2.Core
+open Microsoft.Web.WebView2.Wpf
+open VDA.System
+
+type MainWindow(toolsPath: string) as this =
+    inherit Window()
+
+    let stackPanel = StackPanel(Margin = Thickness(20.0))
+    let labelUrl = Label(Content = "動画 URL:")
+    let txtUrl = TextBox(Height = 30.0, Margin = Thickness(0.0, 5.0, 0.0, 10.0))
+    
+    // yt-dlp と ffmpeg のパスは toolsPath から解決
+    let ytDlpPath = Path.Combine(toolsPath, "yt-dlp.exe")
+    let ffmpegPath = Path.Combine(toolsPath, "ffmpeg.exe")
+    let qjsPath = Path.Combine(toolsPath, "qjs.exe")
+    let cookiePath = Path.Combine(toolsPath, "cookies.txt")
+
+    let labelPath = Label(Content = "保存先フォルダ:")
+    let txtPath = TextBox(Height = 30.0, Text = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), Margin = Thickness(0.0, 5.0, 0.0, 10.0))
+
+    // フォーマット選択用パネル
+    let panelFormat = StackPanel(Orientation = Orientation.Horizontal, Margin = Thickness(0.0, 5.0, 0.0, 10.0))
+    let labelFormat = Label(Content = "保存形式:", VerticalAlignment = VerticalAlignment.Center, Margin = Thickness(0.0, 0.0, 10.0, 0.0))
+    let comboFormat = ComboBox(Height = 25.0, Width = 150.0)
+
+    // WebView2 コントロール
+    let webView = WebView2()
+
+    // UI構築
+    do
+        this.Title <- "動画ダウンローダー VDA"
+        this.Width <- 1000.0
+        this.Height <- 700.0
+        
+        stackPanel.Children.Add(labelUrl) |> ignore
+        stackPanel.Children.Add(txtUrl) |> ignore
+        stackPanel.Children.Add(labelPath) |> ignore
+        stackPanel.Children.Add(txtPath) |> ignore
+        
+        // フォーマット ComboBox init
+        panelFormat.Children.Add(labelFormat) |> ignore
+        panelFormat.Children.Add(comboFormat) |> ignore
+        
+        comboFormat.Items.Add("mp4") |> ignore
+        comboFormat.Items.Add("mkv") |> ignore
+        comboFormat.Items.Add("webm") |> ignore
+        comboFormat.Items.Add("mp3") |> ignore
+        comboFormat.Items.Add("m4a") |> ignore
+        comboFormat.Items.Add("wav") |> ignore
+        comboFormat.Items.Add("flac") |> ignore
+        comboFormat.SelectedIndex <- 0 // Default mp4
+
+        stackPanel.Children.Add(panelFormat) |> ignore
+
+        let btnDownload = Button(Content = "ダウンロード開始", Height = 40.0, Margin = Thickness(0.0, 10.0, 0.0, 0.0))
+        let lblStatus = TextBlock(Text = "待機中... (右側のブラウザでYouTubeにログインしてください)", Margin = Thickness(0.0, 10.0, 0.0, 0.0), TextWrapping = TextWrapping.Wrap)
+
+        stackPanel.Children.Add(btnDownload) |> ignore
+        stackPanel.Children.Add(lblStatus) |> ignore
+        
+        // 詳細ログ表示エリア
+        let logExpander = Expander(Header = "実行ログ詳細", Margin = Thickness(0.0, 10.0, 0.0, 0.0))
+        let txtLog = TextBox(Height = 150.0, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, IsReadOnly = true)
+        logExpander.Content <- txtLog
+        stackPanel.Children.Add(logExpander) |> ignore
+
+        // Grid で左右分割 (40/60)
+        let rootGrid = Grid()
+        rootGrid.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength(4.0, GridUnitType.Star))) // Left 40%
+        rootGrid.ColumnDefinitions.Add(ColumnDefinition(Width = GridLength(6.0, GridUnitType.Star))) // Right 60%
+
+        // Left Side (Controls)
+        let leftScrollViewer = ScrollViewer(VerticalScrollBarVisibility = ScrollBarVisibility.Auto)
+        leftScrollViewer.Content <- stackPanel
+        Grid.SetColumn(leftScrollViewer, 0)
+        rootGrid.Children.Add(leftScrollViewer) |> ignore
+
+        // Right Side (WebView2)
+        Grid.SetColumn(webView, 1)
+        rootGrid.Children.Add(webView) |> ignore
+
+        this.Content <- rootGrid
+
+        // WebView2 初期化 (Loadedイベントで実行)
+        this.Loaded.Add(fun _ -> 
+            let initTask = async {
+                try
+                    // 環境変数設定 (UserDataFolderを指定してセッション保持)
+                    let userDataFolder = Path.Combine(toolsPath, "WebView2Data")
+                    let env = CoreWebView2Environment.CreateAsync(null, userDataFolder, null) |> Async.AwaitTask
+                    let! envObj = env
+                    
+                    do! webView.EnsureCoreWebView2Async(envObj) |> Async.AwaitTask
+                    webView.CoreWebView2.Navigate("https://www.youtube.com")
+                with
+                | ex -> MessageBox.Show(sprintf "WebView2 初期化エラー: %s" ex.Message) |> ignore
+            }
+            Async.StartImmediate(initTask)
+        )
+
+        // クッキーエクスポート関数
+        let exportCookies () = async {
+            if webView.CoreWebView2 <> null then
+                let! cookies = webView.CoreWebView2.CookieManager.GetCookiesAsync("https://www.youtube.com") |> Async.AwaitTask
+                
+                // Netscape HTTP Cookie File format
+                let header = "# Netscape HTTP Cookie File\n# This file is generated by VDA.UI\n"
+                let lines = ResizeArray<string>()
+                lines.Add(header)
+
+                for c in cookies do
+                    let domain = c.Domain
+                    // flag: domain starts with dot?
+                    let flag = if domain.StartsWith(".") then "TRUE" else "FALSE"
+                    let pathStr = c.Path
+                    let secure = if c.IsSecure then "TRUE" else "FALSE"
+                    // Fix: CoreWebView2Cookie.Expires is DateTime, convert to Unix timestamp
+                    let expiration = 
+                        let epoch = DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                        if c.Expires > epoch then 
+                             let seconds = (c.Expires.ToUniversalTime() - epoch).TotalSeconds
+                             Math.Floor(seconds).ToString("F0")
+                        else "0"
+                    let name = c.Name
+                    let value = c.Value
+                    
+                    // domain flag path secure expiration name value
+                    lines.Add(sprintf "%s\t%s\t%s\t%s\t%s\t%s\t%s" domain flag pathStr secure expiration name value)
+                
+                File.WriteAllLines(cookiePath, lines)
+                return true
+            else
+                return false
+        }
+
+        btnDownload.Click.Add(fun _ -> 
+            let url = txtUrl.Text
+            let path = txtPath.Text
+            let format = if comboFormat.SelectedItem <> null then comboFormat.SelectedItem.ToString() else "mp4"
+
+            if not (File.Exists(ytDlpPath)) then
+                MessageBox.Show(sprintf "内部エラー: yt-dlp.exe が展開されていません。\n%s" ytDlpPath, "エラー") |> ignore
+            elif String.IsNullOrWhiteSpace(url) then
+                MessageBox.Show("URLを入力してください") |> ignore
+            else
+                lblStatus.Text <- "Cookie取得中..."
+                btnDownload.IsEnabled <- false
+                txtLog.Text <- "初期化中..."
+                
+                // Async workflow
+                let task = async {
+                    // 1. クッキーをエクスポート
+                    try 
+                        do! exportCookies() |> Async.Ignore
+                        
+                        // UIスレッドに戻してステータス更新 (簡易)
+                        // StartChildで別スレッドへ
+                        let! result = Async.StartChild (async { 
+                            return Native.downloadVideo url path format ytDlpPath ffmpegPath qjsPath cookiePath
+                        })
+                        let! res = result
+                        return res
+                    with
+                    | ex -> return sprintf "Error: %s" ex.Message
+                }
+                
+                Async.StartWithContinuations(
+                    task,
+                    (fun res -> 
+                        this.Dispatcher.Invoke(fun () -> 
+                            if res.StartsWith("Success") then
+                                lblStatus.Text <- "完了: 成功しました"
+                                MessageBox.Show("ダウンロードが完了しました！") |> ignore
+                            elif res.StartsWith("Error") then
+                                lblStatus.Text <- res
+                            else
+                                lblStatus.Text <- "完了: 失敗した可能性があります。ログを確認してください。"
+                            
+                            txtLog.Text <- res
+                            btnDownload.IsEnabled <- true
+                        )
+                    ),
+                    (fun ex -> 
+                        this.Dispatcher.Invoke(fun () -> 
+                            lblStatus.Text <- sprintf "システムエラー: %s" ex.Message
+                            txtLog.Text <- ex.ToString()
+                            btnDownload.IsEnabled <- true
+                        )
+                    ),
+                    (fun _ -> 
+                        this.Dispatcher.Invoke(fun () -> 
+                             btnDownload.IsEnabled <- true
+                        )
+                    )
+                )
+        )

@@ -1,0 +1,131 @@
+module VDA.UI.MainWindow
+
+open System
+open System.IO
+open System.Collections.Generic
+open System.Threading.Tasks
+open System.Windows
+open System.Windows.Controls
+open System.Windows.Media
+open Microsoft.Web.WebView2.Core
+open Microsoft.Web.WebView2.Wpf
+open VDA.System
+
+type MainWindow(toolsPath: string) as this =
+    inherit Window()
+
+    let stackPanel = StackPanel(Margin = Thickness(20.0))
+    let labelUrl = Label(Content = "動画 URL:")
+    let txtUrl = TextBox(Height = 30.0, Margin = Thickness(0.0, 5.0, 0.0, 10.0))
+    
+    // yt-dlp と ffmpeg のパスは toolsPath から解決
+    let ytDlpPath = Path.Combine(toolsPath, "yt-dlp.exe")
+    let ffmpegPath = Path.Combine(toolsPath, "ffmpeg.exe")
+    let qjsPath = Path.Combine(toolsPath, "qjs.exe")
+
+    let labelPath = Label(Content = "保存先フォルダ:")
+    let txtPath = TextBox(Height = 30.0, Text = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), Margin = Thickness(0.0, 5.0, 0.0, 10.0))
+
+    // フォーマット選択用パネル
+    let panelFormat = StackPanel(Orientation = Orientation.Horizontal, Margin = Thickness(0.0, 5.0, 0.0, 10.0))
+    let labelFormat = Label(Content = "保存形式:", VerticalAlignment = VerticalAlignment.Center, Margin = Thickness(0.0, 0.0, 10.0, 0.0))
+    let comboFormat = ComboBox(Height = 25.0, Width = 150.0)
+
+    // UI構築
+    do
+        this.Title <- "動画ダウンローダー VDA"
+        this.Width <- 550.0
+        this.Height <- 400.0 // ブラウザ設定がなくなった分縮める
+        
+        stackPanel.Children.Add(labelUrl) |> ignore
+        stackPanel.Children.Add(txtUrl) |> ignore
+        stackPanel.Children.Add(labelPath) |> ignore
+        stackPanel.Children.Add(txtPath) |> ignore
+        
+        // フォーマット ComboBox init
+        panelFormat.Children.Add(labelFormat) |> ignore
+        panelFormat.Children.Add(comboFormat) |> ignore
+        
+        comboFormat.Items.Add("mp4") |> ignore
+        comboFormat.Items.Add("mkv") |> ignore
+        comboFormat.Items.Add("webm") |> ignore
+        comboFormat.Items.Add("mp3") |> ignore
+        comboFormat.Items.Add("m4a") |> ignore
+        comboFormat.Items.Add("wav") |> ignore
+        comboFormat.Items.Add("flac") |> ignore
+        comboFormat.SelectedIndex <- 0 // Default mp4
+
+        stackPanel.Children.Add(panelFormat) |> ignore
+
+        // ブラウザ設定は削除
+
+        let btnDownload = Button(Content = "ダウンロード開始", Height = 40.0, Margin = Thickness(0.0, 10.0, 0.0, 0.0))
+        let lblStatus = TextBlock(Text = "待機中...", Margin = Thickness(0.0, 10.0, 0.0, 0.0))
+
+        stackPanel.Children.Add(btnDownload) |> ignore
+        stackPanel.Children.Add(lblStatus) |> ignore
+        
+        // 詳細ログ表示エリア
+        let logExpander = Expander(Header = "実行ログ詳細", Margin = Thickness(0.0, 10.0, 0.0, 0.0))
+        let txtLog = TextBox(Height = 150.0, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, IsReadOnly = true)
+        logExpander.Content <- txtLog
+        stackPanel.Children.Add(logExpander) |> ignore
+
+        // ScrollViewer で全体をラップ
+        this.Content <- StackPanel() // 現在のContentを一旦外す(ダミー)
+        let scrollViewer = ScrollViewer(VerticalScrollBarVisibility = ScrollBarVisibility.Auto)
+        scrollViewer.Content <- stackPanel
+        this.Content <- scrollViewer
+
+        btnDownload.Click.Add(fun _ -> 
+            let url = txtUrl.Text
+            let path = txtPath.Text
+            // 選択されたフォーマットを取得
+            let format = if comboFormat.SelectedItem <> null then comboFormat.SelectedItem.ToString() else "mp4"
+
+            if not (File.Exists(ytDlpPath)) then
+                MessageBox.Show(sprintf "内部エラー: yt-dlp.exe が展開されていません。\n%s" ytDlpPath, "エラー") |> ignore
+            elif String.IsNullOrWhiteSpace(url) then
+                MessageBox.Show("URLを入力してください") |> ignore
+            else
+                lblStatus.Text <- "ダウンロード中..."
+                btnDownload.IsEnabled <- false
+                txtLog.Text <- "実行中..."
+                
+                 // 非同期実行
+                let task = async {
+                    let! result = Async.StartChild (async { 
+                        // ブラウザ指定は削除 (ネイティブ呼び出しからも除去)
+                        return Native.downloadVideo url path format ytDlpPath ffmpegPath qjsPath
+                    })
+                    let! res = result
+                    return res
+                }
+                Async.StartWithContinuations(
+                    task,
+                    (fun res -> 
+                        this.Dispatcher.Invoke(fun () -> 
+                            if res.StartsWith("Success") then
+                                lblStatus.Text <- "完了: 成功しました"
+                                MessageBox.Show("ダウンロードが完了しました！") |> ignore
+                            else
+                                lblStatus.Text <- "完了: 失敗した可能性があります。ログを確認してください。"
+                            
+                            txtLog.Text <- res
+                            btnDownload.IsEnabled <- true
+                        )
+                    ),
+                    (fun ex -> 
+                        this.Dispatcher.Invoke(fun () -> 
+                            lblStatus.Text <- sprintf "システムエラー: %s" ex.Message
+                            txtLog.Text <- ex.ToString()
+                            btnDownload.IsEnabled <- true
+                        )
+                    ),
+                    (fun _ -> 
+                        this.Dispatcher.Invoke(fun () -> 
+                             btnDownload.IsEnabled <- true
+                        )
+                    )
+                )
+        )

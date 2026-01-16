@@ -1,0 +1,15 @@
+target/
+**/*.rs.bk
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.pdb
+*.cache
+project.assets.json
+*.nuget.g.props
+*.nuget.g.targets
+# Large binaries
+src/VDA.System/Resources/ffmpeg.exe
+src/VDA.System/Resources/ffprobe.exe

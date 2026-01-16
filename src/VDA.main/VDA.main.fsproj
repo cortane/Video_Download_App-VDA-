@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>VDA</AssemblyName>
+    <!-- 単一ファイル発行の設定 -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained> <!-- DotNet環境がある前提でサイズを小さくするならfalse -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VDA.System\VDA.System.fsproj" />
+    <ProjectReference Include="..\VDA.UI\VDA.UI.fsproj" />
+  </ItemGroup>
+
+</Project>
