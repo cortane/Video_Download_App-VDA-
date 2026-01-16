@@ -24,31 +24,57 @@ $FfmpegUrl = "https://github.com/yt-dlp/FFmpeg-Builds/releases/latest/download/f
 $ZipPath = Join-Path $PSScriptRoot "ffmpeg.zip"
 $ExtractPath = Join-Path $PSScriptRoot "ffmpeg_temp"
 
-Write-Host "Downloading ffmpeg..."
-Invoke-WebRequest -Uri $FfmpegUrl -OutFile $ZipPath
+# Write-Host "Downloading ffmpeg..."
+# Invoke-WebRequest -Uri $FfmpegUrl -OutFile $ZipPath
 
-Write-Host "Extracting ffmpeg..."
-if (Test-Path $ExtractPath) { Remove-Item -Recurse -Force $ExtractPath }
-Expand-Archive -Path $ZipPath -DestinationPath $ExtractPath
+# Write-Host "Extracting ffmpeg..."
+# if (Test-Path $ExtractPath) { Remove-Item -Recurse -Force $ExtractPath }
+# Expand-Archive -Path $ZipPath -DestinationPath $ExtractPath
 
-$BinFolder = Get-ChildItem -Path $ExtractPath -Recurse -Filter "bin" | Select-Object -First 1
-if ($BinFolder) {
-    Copy-Item -Path (Join-Path $BinFolder.FullName "ffmpeg.exe") -Destination $TargetDir
-    Copy-Item -Path (Join-Path $BinFolder.FullName "ffprobe.exe") -Destination $TargetDir
-    Write-Host "ffmpeg.exe, ffprobe.exe downloaded." -ForegroundColor Green
+# $BinFolder = Get-ChildItem -Path $ExtractPath -Recurse -Filter "bin" | Select-Object -First 1
+# if ($BinFolder) {
+#    Copy-Item -Path (Join-Path $BinFolder.FullName "ffmpeg.exe") -Destination $TargetDir
+#    Copy-Item -Path (Join-Path $BinFolder.FullName "ffprobe.exe") -Destination $TargetDir
+#    Write-Host "ffmpeg.exe, ffprobe.exe downloaded." -ForegroundColor Green
+# } else {
+#    Write-Host "ffmpeg binary not found." -ForegroundColor Red
+# }
+
+# Remove-Item -Force $ZipPath
+# Remove-Item -Recurse -Force $ExtractPath
+
+
+# 3. Deno (Preferred by yt-dlp)
+# Node.js was marked as unsupported by yt-dlp.
+# QuickJS-NG was slow.
+# Using Deno which is the default enabled runtime.
+$DenoUrl = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip"
+
+$DenoZipPath = Join-Path $PSScriptRoot "deno.zip"
+$DenoExtractPath = Join-Path $PSScriptRoot "deno_temp"
+$DenoDest = Join-Path $TargetDir "deno.exe"
+
+Write-Host "Downloading Deno..."
+Invoke-WebRequest -Uri $DenoUrl -OutFile $DenoZipPath
+
+Write-Host "Extracting Deno..."
+if (Test-Path $DenoExtractPath) { Remove-Item -Recurse -Force $DenoExtractPath }
+Expand-Archive -Path $DenoZipPath -DestinationPath $DenoExtractPath
+
+$SourceDeno = Join-Path $DenoExtractPath "deno.exe"
+if (Test-Path $SourceDeno) {
+    Copy-Item -Path $SourceDeno -Destination $DenoDest
+    Write-Host "deno.exe downloaded." -ForegroundColor Green
 } else {
-    Write-Host "ffmpeg binary not found." -ForegroundColor Red
+    Write-Host "deno.exe not found in zip!" -ForegroundColor Red
 }
 
-Remove-Item -Force $ZipPath
-Remove-Item -Recurse -Force $ExtractPath
+# Cleanup
+Remove-Item -Force $DenoZipPath
+Remove-Item -Recurse -Force $DenoExtractPath
 
-# 3. QuickJS (qjs.exe)
-$QjsUrl = "https://github.com/quickjs-ng/quickjs/releases/download/v0.11.0/qjs-windows-x86_64.exe"
-$QjsPath = Join-Path $TargetDir "qjs.exe"
-
-Write-Host "Downloading QuickJS (qjs.exe)..."
-Invoke-WebRequest -Uri $QjsUrl -OutFile $QjsPath
-Write-Host "qjs.exe downloaded." -ForegroundColor Green
+# Cleanup old binaries
+$OldNode = Join-Path $TargetDir "node.exe"
+if (Test-Path $OldNode) { Remove-Item -Force $OldNode }
 
 Write-Host "Setup Completed." -ForegroundColor Cyan

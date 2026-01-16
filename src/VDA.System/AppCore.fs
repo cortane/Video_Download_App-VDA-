@@ -3,6 +3,13 @@ module VDA.System.AppCore
 open System
 open System.IO
 open System.Reflection
+open System.Runtime.InteropServices
+
+[<DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)>]
+extern bool SetDllDirectory(string lpPathName)
+
+let setDllDirectory (path: string) =
+    SetDllDirectory(path)
 
 /// 埋め込みリソースを一時フォルダに展開する
 let extractEmbeddedResources () =
@@ -41,7 +48,7 @@ let extractEmbeddedResources () =
         if name.EndsWith("yt-dlp.exe") then extract name "yt-dlp.exe"
         elif name.EndsWith("ffmpeg.exe") then extract name "ffmpeg.exe"
         elif name.EndsWith("ffprobe.exe") then extract name "ffprobe.exe"
-        elif name.EndsWith("qjs.exe") then extract name "qjs.exe"
+        elif name.EndsWith("deno.exe") then extract name "deno.exe"
         elif name.EndsWith("vda_core.dll") then 
             // DLLは実行ディレクトリにも必要かもしれないが、LoadLibraryで読み込むならパス指定が必要
             // 今回は DllImport("vda_core.dll") なので、
@@ -54,8 +61,4 @@ let extractEmbeddedResources () =
             extract name "vda_core.dll"
 
     tempPath
-    
-open System.Runtime.InteropServices
 
-[<DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)>]
-extern bool SetDllDirectory(string lpPathName)

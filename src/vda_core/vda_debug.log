@@ -1,0 +1,10 @@
+[YoutubeYtBe] Extracting URL: https://youtu.be/J1DUE3l46Fg?list=RDJ1DUE3l46Fg
+[youtube:tab] Extracting URL: https://www.youtube.com/watch?v=J1DUE3l46Fg&list=RDJ1DUE3l46Fg&feature=youtu.be
+[youtube:tab] Downloading just the video J1DUE3l46Fg because of --no-playlist
+[youtube] Extracting URL: https://www.youtube.com/watch?v=J1DUE3l46Fg
+[youtube] J1DUE3l46Fg: Downloading webpage
+[youtube] J1DUE3l46Fg: Downloading tv downgraded player API JSON
+[youtube] J1DUE3l46Fg: Downloading web safari player API JSON
+[youtube] J1DUE3l46Fg: Downloading m3u8 information
+failed: Some formats may be missing. Ensure you have a supported JavaScript runtime and challenge solver script distribution installed. Review any warnings presented before this message. For more details, refer to  https://github.com/yt-dlp/yt-dlp/wiki/EJS
+ERROR: [youtube] J1DUE3l46Fg: Requested format is not available. Use --list-formats for a list of available formats

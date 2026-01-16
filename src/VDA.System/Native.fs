@@ -27,3 +27,7 @@ let downloadVideo (url: string) (path: string) (format: string) (execPath: strin
         Marshal.PtrToStringUTF8(ptr)
     finally
         free_string(ptr)
+
+[<DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)>]
+extern bool SetDllDirectory(string lpPathName)
+

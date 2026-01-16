@@ -10,7 +10,7 @@ let main argv =
     try
         let toolsPath = VDA.System.AppCore.extractEmbeddedResources()
         // DLLの検索パスを追加 (vda_core.dll のため)
-        VDA.System.AppCore.SetDllDirectory(toolsPath) |> ignore
+        VDA.System.AppCore.setDllDirectory(toolsPath) |> ignore
         
         let app = Application()
         app.Run(new VDA.UI.MainWindow.MainWindow(toolsPath)) |> ignore

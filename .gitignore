@@ -10,6 +10,12 @@ obj/
 project.assets.json
 *.nuget.g.props
 *.nuget.g.targets
-# Large binaries
+*.log
+# Large binaries (downloaded via script)
 src/VDA.System/Resources/ffmpeg.exe
 src/VDA.System/Resources/ffprobe.exe
+src/VDA.System/Resources/yt-dlp.exe
+src/VDA.System/Resources/deno.exe
+*.zip
+*_temp/
+vda_core.dll

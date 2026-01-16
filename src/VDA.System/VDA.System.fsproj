@@ -14,7 +14,7 @@
     <EmbeddedResource Include="Resources\yt-dlp.exe" />
     <EmbeddedResource Include="Resources\ffmpeg.exe" />
     <EmbeddedResource Include="Resources\ffprobe.exe" />
-    <EmbeddedResource Include="Resources\qjs.exe" />
+    <EmbeddedResource Include="Resources\deno.exe" />
     <EmbeddedResource Include="Resources\vda_core.dll" />
   </ItemGroup>
 
